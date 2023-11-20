@@ -1,9 +1,9 @@
-
 Este código en R se encarga de realizar una búsqueda de noticias en una fuente específica (en este caso, "pagina12.com.ar") en un rango de fechas definido, recuperar los resultados de la búsqueda desde la API de GDELT, almacenar los datos en un DataFrame, realizar una deduplicación de los resultados y exportarlos a un archivo CSV. Aquí está el desglose del código paso a paso:
 
 Vamos a usar la fuente de Pagina12 para esta entrega.
 
 ```{r}
+#| eval: false
 #########################
 if (!require("tidyverse")) install.packages("tidyverse")
 if (!require("readr")) install.packages("readr")
@@ -15,70 +15,8 @@ library(dplyr)
 library(tidytext)
 library(stringr) # Part of the tidyverse package
 
-#########################
-query <- " " #Enter search term(s)
-startdate <- "20230201" #Enter preferred start date
-enddate <- "20230815" #Enter preferred end date
-sources <- c("pagina12.com.ar") #Enter sources to search
 
-#########################
-#Generating a sequence of dates
-startdate2 <- as.Date(startdate,"%Y%m%d")
-enddate2 <- as.Date(enddate,"%Y%m%d")
-dates <- seq(as.Date(startdate2), as.Date(enddate2), "days")
-dates <- format(dates, "%Y%m%d")
-#Estimating run time for query
-Minutes <- round((length(sources)*(length(dates)*2.5/60)), digits = 1)
-Hours <- round((length(sources)*(length(dates)*2.5/3600)), digits = 1)
-print(paste0("In minutes: ",Minutes,". In hours: ",Hours,"."))
-
-#########################
-#Creating the dataframe
-Headlines = data.frame(
-  Source = character(),
-  URL = character(),
-  MobileURL = character(),
-  Date = character(),
-  Title = character(),
-  stringsAsFactors = FALSE)
-# For loops
-for (thissource in sources)
-{  
-  for (thisdate in dates)
-  {
-    URL_p1 <- "https://api.gdeltproject.org/api/v2/doc/doc?query="
-    URL_p2 <- " domainis:"
-    URL_p3 <- "&mode=artlist&maxrecords=250&sort=datedesc&startdatetime="
-    URL_p4 <- "000000&enddatetime="
-    URL_p5 <- "235959&format=CSV"
-    URL_raw <- paste0(URL_p1,
-                      query,
-                      URL_p2,
-                      thissource,
-                      URL_p3,
-                      thisdate,
-                      URL_p4,
-                      thisdate,
-                      URL_p5)
-    URL_encoded <- URLencode(URL_raw)
-    print("Getting data for")
-    print(paste0(thisdate," ",thissource))
-    print(URL_encoded)
-    Thisfetch <- read_csv(URL_encoded, show_col_types = FALSE)
-    Thisfetch$Source <- thissource
-    print(paste0(nrow(Thisfetch)," rows"))
-    Headlines <- rbind(Headlines,Thisfetch)
-    #Sys.sleep(2)
-  }
-}
-#Deduplicate, check, and export data
-Headlines <- Headlines[!duplicated(Headlines$URL),]
-CountsBySource <- Headlines %>% 
-  group_by(Source) %>% 
-  summarize(HeadlineCount = n())
-View(CountsBySource)
-filename <- paste0(query,"-",startdate,"-",enddate,".csv")
-write_excel_csv(Headlines,filename)
+read_csv(Headlines,filename)
 #Cleanup
 rm(Thisfetch,
    dates,
@@ -98,8 +36,6 @@ rm(Thisfetch,
    URL_p4,
    URL_p5,
    URL_raw)
-#View raw data frame
-View(Headlines)
 
 #########################
 #Headline word counts
@@ -118,33 +54,13 @@ WordCounts <- WordCounts %>%
   anti_join(my_stopwords)
 rm(stop_words,
    my_stopwords)
-#Viewing word counts
-View(WordCounts)
 ```
 
-Siguiente paso, una vez que tenemos las noticias recopiladas, es extraer el contenido de ellas.
-
-```{r}
-library(readr)
-source(here::here("R", "scrape-news.R"))
-
-mydata <- read_csv(here::here("data", "pagina12-20230201-20230815.csv"))
-
-
-my_links <- mydata$URL
-purrr::map(my_links, ~{
-  scrape_news(.x, title_tag = "h1", content_tag = ".article-main-content.article-text")
-}) %>% 
-  bind_rows() -> my_data
-
-output_filename <- here::here("data", "scraping-pagina12-2023-10-09.rds")
-
-readr::write_rds(my_data, output_filename)
-```
 
 Luego, contamos qué palabras se repiten en esos contenidos.
 
 ```{r}
+#| eval: false
 # Instala y carga la biblioteca necesaria (si no lo has hecho antes)
 ##install.packages("tm")
 ##install.packages("matrixStats")  # Agregar esta línea para corregir el error
@@ -159,7 +75,7 @@ library(ldatuning)
 library(syuzhet)
 
 # Cargar el archivo .rds
-my_data <- readRDS("data/scraping-pagina12-2023-10-09.rds")
+my_data <- readRDS(here::here("data/scraping-pagina12-2023-10-09.rds"))
 
 
 my_data %>% 
@@ -212,5 +128,3 @@ head(word_freq, 10)
 
 
 ```
-
- 
